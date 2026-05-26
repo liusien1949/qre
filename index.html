@@ -55,12 +55,12 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
   <div id="DD" class="dead" style="display:none">
     <div class="icon">&#128274;&#128293;</div>
     <h2>已焚毁</h2>
-    <p>该消息已被查看、密码错误、或触发安全保护，密钥已销毁，无法再次解密。</p>
+    <p id="deadMsg">该消息已被查看、密码错误、或触发安全保护，密钥已销毁，无法再次解密。</p>
   </div>
 </div>
 <script>
 (function(){
-var D="",N="",alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",sid="";
+var D="",N="",ET=0,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",sid="";
 
 function init(){
   if(!window.crypto||!window.crypto.subtle){
@@ -68,14 +68,22 @@ function init(){
     return;
   }
   var h=location.hash.substring(1);
-  if(!h||h.indexOf("QRE:v1:")!==0){
+  if(!h){
     document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>无效链接</h2><p class="sub">未找到加密数据。</p>';
     return;
   }
-  D=h;
+  // 解析格式: QRE:v1:...|expire_timestamp
+  var parts=h.split("|");
+  D=parts[0];
+  ET=parts.length>1?parseInt(parts[1],10):0;
+  if(!D||D.indexOf("QRE:v1:")!==0){
+    document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>无效链接</h2><p class="sub">未找到加密数据。</p>';
+    return;
+  }
   N=D.substring(7,23);
   sid=Math.random().toString(36).substring(2,8).toUpperCase();
-  try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead();}}catch(e){}
+  try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead("该消息已被查看过");}}catch(e){}
+  if(alive&&ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");}
   if(alive)setTimeout(function(){if(!alive)return;var a=performance.now();debugger;if(performance.now()-a>200){burn();}},500);
 }
 
@@ -83,13 +91,14 @@ function burn(){
   alive=0;
   try{localStorage.setItem("qre_"+N,"1");}catch(e){}
   D="QRE:v1:"+btoa(String.fromCharCode.apply(null,window.crypto.getRandomValues(new Uint8Array(64))));
-  showDead();
+  showDead("该消息已被销毁");
 }
 
-function showDead(){
+function showDead(msg){
   document.getElementById("L").style.display="none";
   document.getElementById("R").classList.remove("show");
   document.getElementById("R").style.display="none";
+  if(msg)document.getElementById("deadMsg").textContent=msg;
   document.getElementById("DD").style.display="block";
 }
 
@@ -99,7 +108,7 @@ function hideContent(){
   document.getElementById("R").classList.remove("show");
   document.getElementById("R").style.display="none";
   plainText="";
-  showDead();
+  showDead("内容已自动销毁");
 }
 
 function renderCanvas(text){
@@ -192,6 +201,7 @@ document.addEventListener("visibilitychange",function(){
 
 window.doDecrypt=function(){
   if(!alive)return;
+  if(ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
   var a=performance.now();debugger;if(performance.now()-a>200){burn();return;}
   var pwd=document.getElementById("pwd").value;
   var err=document.getElementById("err");
