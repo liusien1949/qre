@@ -60,7 +60,7 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 </div>
 <script>
 (function(){
-var D="",N="",ET=0,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",sid="";
+var D="",N="",ET=0,VT=10,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="";
 
 function init(){
   if(!window.crypto||!window.crypto.subtle){
@@ -72,16 +72,17 @@ function init(){
     document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>无效链接</h2><p class="sub">未找到加密数据。</p>';
     return;
   }
-  // 解析格式: QRE:v1:...|expire_timestamp
+  // 解析格式: QRE:v1:...|expire_timestamp|view_seconds
   var parts=h.split("|");
   D=parts[0];
   ET=parts.length>1?parseInt(parts[1],10):0;
+  VT=parts.length>2?parseInt(parts[2],10):10;
+  if(isNaN(VT)||VT<1)VT=10;
   if(!D||D.indexOf("QRE:v1:")!==0){
     document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>无效链接</h2><p class="sub">未找到加密数据。</p>';
     return;
   }
   N=D.substring(7,23);
-  sid=Math.random().toString(36).substring(2,8).toUpperCase();
   try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead("该消息已被查看过");}}catch(e){}
   if(alive&&ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");}
 }
@@ -116,76 +117,71 @@ function renderCanvas(text){
   var dpr=window.devicePixelRatio||1;
   var w=Math.min(c.parentElement.clientWidth-36,380);
   if(w<100)w=340;
-  var fontSize=15;
-  var lineHeight=fontSize*1.6;
   var padding=16;
 
-  var tmp=document.createElement("canvas");
-  var tctx=tmp.getContext("2d");
-  tctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
+  if(text.indexOf("IMG:")===0){
+    var dataUrl=text.substring(4);
+    var img=new Image();
+    img.onload=function(){
+      var scale=Math.min((w-padding*2)/img.width,1);
+      var dw=img.width*scale;
+      var dh=img.height*scale;
+      c.width=w*dpr;c.height=(dh+padding*2)*dpr;c.style.width=w+"px";c.style.height=(dh+padding*2)+"px";
+      var ctx=c.getContext("2d");ctx.scale(dpr,dpr);
+      ctx.fillStyle="#f0fdf4";ctx.beginPath();ctx.roundRect(0,0,w,dh+padding*2,8);ctx.fill();
+      ctx.drawImage(img,(w-dw)/2,padding,dw,dh);
+    };
+    img.src=dataUrl;
+  }else{
+    var fontSize=15;
+    var lineHeight=fontSize*1.6;
+    var tmp=document.createElement("canvas");
+    var tctx=tmp.getContext("2d");
+    tctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
 
-  var lines=[];
-  var paragraphs=text.split("\n");
-  for(var p=0;p<paragraphs.length;p++){
-    var words=paragraphs[p];
-    if(words.length===0){lines.push("");continue;}
-    var cur="";
-    for(var i=0;i<words.length;i++){
-      var test=cur+words[i];
-      if(tctx.measureText(test).width>w-padding*2){
-        lines.push(cur);
-        cur=words[i];
-      }else{
-        cur=test;
+    var lines=[];
+    var paragraphs=text.split("\n");
+    for(var p=0;p<paragraphs.length;p++){
+      var words=paragraphs[p];
+      if(words.length===0){lines.push("");continue;}
+      var cur="";
+      for(var i=0;i<words.length;i++){
+        var test=cur+words[i];
+        if(tctx.measureText(test).width>w-padding*2){
+          lines.push(cur);
+          cur=words[i];
+        }else{
+          cur=test;
+        }
       }
+      if(cur)lines.push(cur);
     }
-    if(cur)lines.push(cur);
-  }
 
-  var h=lines.length*lineHeight+padding*2+20;
-  c.width=w*dpr;
-  c.height=h*dpr;
-  c.style.width=w+"px";
-  c.style.height=h+"px";
-  var ctx=c.getContext("2d");
-  ctx.scale(dpr,dpr);
+    var h=lines.length*lineHeight+padding*2+20;
+    c.width=w*dpr;
+    c.height=h*dpr;
+    c.style.width=w+"px";
+    c.style.height=h+"px";
+    var ctx=c.getContext("2d");
+    ctx.scale(dpr,dpr);
 
-  ctx.fillStyle="#f0fdf4";
-  ctx.beginPath();
-  ctx.roundRect(0,0,w,h,8);
-  ctx.fill();
+    ctx.fillStyle="#f0fdf4";
+    ctx.beginPath();
+    ctx.roundRect(0,0,w,h,8);
+    ctx.fill();
 
-  ctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
-  ctx.fillStyle="#1a1a1a";
-  ctx.textBaseline="top";
-  for(var i=0;i<lines.length;i++){
-    ctx.fillText(lines[i],padding,padding+i*lineHeight);
-  }
-
-  ctx.save();
-  ctx.globalAlpha=0.08;
-  ctx.font="bold 14px -apple-system,sans-serif";
-  ctx.fillStyle="#000";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  var now=new Date();
-  var ts=now.getFullYear()+""+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0")+String(now.getHours()).padStart(2,"0")+String(now.getMinutes()).padStart(2,"0");
-  var wm=sid+" "+ts;
-  for(var y=30;y<h;y+=60){
-    for(var x=40;x<w;x+=120){
-      ctx.save();
-      ctx.translate(x,y);
-      ctx.rotate(-0.35);
-      ctx.fillText(wm,0,0);
-      ctx.restore();
+    ctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
+    ctx.fillStyle="#1a1a1a";
+    ctx.textBaseline="top";
+    for(var i=0;i<lines.length;i++){
+      ctx.fillText(lines[i],padding,padding+i*lineHeight);
     }
   }
-  ctx.restore();
   });
 }
 
 function startTimer(){
-  viewing=1;viewLeft=6;
+  viewing=1;viewLeft=VT;
   var el=document.getElementById("tmr");
   el.textContent="⏱ 剩余 "+viewLeft+" 秒";
   el.className="timer";
