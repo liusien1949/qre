@@ -60,7 +60,7 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 </div>
 <script>
 (function(){
-var D="",N="",ET=0,VT=10,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="";
+var D="",N="",ET=0,VT=10,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",msgId="";
 
 function init(){
   if(!window.crypto||!window.crypto.subtle){
@@ -68,30 +68,15 @@ function init(){
     return;
   }
   var params=new URLSearchParams(location.search);
-  var msgId=params.get("id");
+  msgId=params.get("id")||"";
   var h=location.hash.substring(1);
 
   if(msgId){
-    // 新模式: ?id=msg_xxxx → 从 GitHub Pages 拉取数据文件
+    // 新模式: ?id=msg_xxxx → 显示密码框，等用户点解密时再拉数据
     var hashParts=h.split("|");
     ET=hashParts.length>0?parseInt(hashParts[0],10):0;
     VT=hashParts.length>1?parseInt(hashParts[1],10):10;
     if(isNaN(VT)||VT<1)VT=10;
-    var dataUrl="https://liusien1949.github.io/qre/data/"+msgId+".json";
-    fetch(dataUrl).then(function(r){
-      if(!r.ok)throw new Error("HTTP "+r.status);
-      return r.json();
-    }).then(function(j){
-      D=j.d||"";
-      if(j.e)ET=j.e;
-      if(j.v)VT=j.v;
-      if(!D||D.indexOf("QRE:v1:")!==0)throw new Error("无效数据");
-      N=D.substring(7,23);
-      try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead("该消息已被查看过");return;}}catch(e){}
-      if(alive&&ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
-    }).catch(function(e){
-      document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>加载失败</h2><p class="sub">无法获取加密数据: '+e.message+'</p>';
-    });
   }else if(h){
     // 旧模式: 从 hash 中读取加密数据
     var parts=h.split("|");
@@ -109,6 +94,20 @@ function init(){
   }else{
     document.getElementById("L").innerHTML='<div class="icon">&#128274;</div><h2>无效链接</h2><p class="sub">未找到加密数据。</p>';
   }
+}
+
+function fetchData(){
+  var dataUrl="https://liusien1949.github.io/qre/data/"+msgId+".json";
+  return fetch(dataUrl).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  }).then(function(j){
+    D=j.d||"";
+    if(j.e)ET=j.e;
+    if(j.v)VT=j.v;
+    if(!D||D.indexOf("QRE:v1:")!==0)throw new Error("无效数据");
+    N=D.substring(7,23);
+  });
 }
 
 function burn(){
@@ -270,7 +269,10 @@ window.doDecrypt=function(){
   var err=document.getElementById("err");
   err.textContent="";
   if(!pwd){err.textContent="请输入密码";return;}
-  try{
+
+  function doDecryptWithData(){
+    if(!D||D.indexOf("QRE:v1:")!==0){err.textContent="加密数据无效";return;}
+    try{
     var raw=atob(D.substring(7));
     var bytes=new Uint8Array(raw.length);
     for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
@@ -297,6 +299,20 @@ window.doDecrypt=function(){
       err.textContent="解密失败: "+(e.message||e.name||"未知错误");
     });
   }catch(e){err.textContent="解密异常: "+e.message;}
+  }
+
+  if(msgId&&!D){
+    // 有消息ID但还没拉取数据 → 先拉取
+    err.textContent="正在加载数据...";
+    fetchData().then(function(){
+      err.textContent="";
+      doDecryptWithData();
+    }).catch(function(e){
+      err.textContent="加载失败: "+e.message+"，请稍后重试";
+    });
+  }else{
+    doDecryptWithData();
+  }
 };
 
 document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
