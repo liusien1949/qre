@@ -202,7 +202,7 @@ document.addEventListener("visibilitychange",function(){
 });
 
 window.doDecrypt=function(){
-  if(!alive)return;
+  if(!alive){showDead("该消息已被销毁");return;}
   if(ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
   var pwd=document.getElementById("pwd").value;
   var err=document.getElementById("err");
@@ -212,7 +212,7 @@ window.doDecrypt=function(){
     var raw=atob(D.substring(7));
     var bytes=new Uint8Array(raw.length);
     for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-    if(bytes.length<33){err.textContent="数据异常";return;}
+    if(bytes.length<33){err.textContent="数据异常("+bytes.length+")";return;}
     crypto.subtle.importKey("raw",new TextEncoder().encode(pwd),{"name":"PBKDF2"},false,["deriveKey"]
     ).then(function(k){
       return crypto.subtle.deriveKey({"name":"PBKDF2","salt":bytes.slice(0,16),"iterations":100000,"hash":"SHA-256"},k,{"name":"AES-CBC","length":256},false,["decrypt"]);
@@ -229,12 +229,12 @@ window.doDecrypt=function(){
       document.getElementById("R").style.display="block";
       document.getElementById("R").classList.add("show");
       startTimer();
-    }).catch(function(){
+    }).catch(function(e){
       if(!alive)return;
       burn();
-      err.textContent="密码错误，消息已销毁";
+      err.textContent="解密失败: "+(e.message||e.name||"未知错误");
     });
-  }catch(e){err.textContent="解密失败";}
+  }catch(e){err.textContent="解密异常: "+e.message;}
 };
 
 document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
