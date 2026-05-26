@@ -111,9 +111,11 @@ function hideContent(){
 }
 
 function renderCanvas(text){
+  requestAnimationFrame(function(){
   var c=document.getElementById("canvas");
   var dpr=window.devicePixelRatio||1;
   var w=Math.min(c.parentElement.clientWidth-36,380);
+  if(w<100)w=340;
   var fontSize=15;
   var lineHeight=fontSize*1.6;
   var padding=16;
@@ -179,10 +181,11 @@ function renderCanvas(text){
     }
   }
   ctx.restore();
+  });
 }
 
 function startTimer(){
-  viewing=1;viewLeft=4;
+  viewing=1;viewLeft=6;
   var el=document.getElementById("tmr");
   el.textContent="⏱ 剩余 "+viewLeft+" 秒";
   el.className="timer";
