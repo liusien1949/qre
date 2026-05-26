@@ -20,12 +20,10 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 .btn:active{transform:translateY(0);box-shadow:none}
 .btn:disabled{background:#ccc;cursor:not-allowed;transform:none;box-shadow:none}
 .err{color:#e74c3c;font-size:13px;margin-top:12px;min-height:20px}
-.result{margin-top:20px;padding:18px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1px solid #bbf7d0;border-radius:14px;display:none;word-break:break-all;text-align:left}
+.result{margin-top:20px;padding:18px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1px solid #bbf7d0;border-radius:14px;display:none;text-align:left;position:relative}
 .result.show{display:block;animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.result-t{font-size:15px;color:#1a1a1a;line-height:1.6}
-.result-t a{color:#667eea;text-decoration:none}
-.result-t a:hover{text-decoration:underline}
+.result canvas{width:100%;border-radius:8px;display:block}
 .copy-btn{width:100%;padding:12px;background:#f0f0f0;color:#333;border:none;border-radius:10px;cursor:pointer;margin-top:12px;font-size:13px;touch-action:manipulation;min-height:44px;transition:all .15s}
 .copy-btn:hover{background:#e0e0e0}
 .timer{font-size:13px;color:#e67e22;font-weight:600;margin-top:10px;padding:6px 14px;background:#fff8f0;border-radius:8px;display:inline-block}
@@ -53,7 +51,7 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
     <p style="font-size:11px;color:#bbb;margin-top:12px">此工具仅供技术交流和娱乐，不可用于任何非法用途！</p>
   </div>
   <div id="R" class="result">
-    <div class="result-t" id="txt"></div>
+    <canvas id="canvas"></canvas>
     <button class="copy-btn" onclick="doCopy()" id="cpbtn">复制内容</button>
     <div class="timer" id="tmr"></div>
   </div>
@@ -65,7 +63,7 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 </div>
 <script>
 (function(){
-var D="",N="",alive=1,viewing=0,viewLeft=0,viewTmr=null;
+var D="",N="",alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",sid="";
 
 function init(){
   if(!window.crypto||!window.crypto.subtle){
@@ -79,6 +77,7 @@ function init(){
   }
   D=h;
   N=D.substring(7,23);
+  sid=Math.random().toString(36).substring(2,8).toUpperCase();
   try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead();}}catch(e){}
   if(alive)setTimeout(function(){if(!alive)return;var a=performance.now();debugger;if(performance.now()-a>200){burn();}},500);
 }
@@ -102,8 +101,79 @@ function hideContent(){
   if(viewTmr)clearInterval(viewTmr);
   document.getElementById("R").classList.remove("show");
   document.getElementById("R").style.display="none";
-  document.getElementById("txt").textContent="";
+  plainText="";
   showDead();
+}
+
+function renderCanvas(text){
+  var c=document.getElementById("canvas");
+  var dpr=window.devicePixelRatio||1;
+  var w=Math.min(c.parentElement.clientWidth-36,380);
+  var fontSize=15;
+  var lineHeight=fontSize*1.6;
+  var padding=16;
+
+  var tmp=document.createElement("canvas");
+  var tctx=tmp.getContext("2d");
+  tctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
+
+  var lines=[];
+  var paragraphs=text.split("\n");
+  for(var p=0;p<paragraphs.length;p++){
+    var words=paragraphs[p];
+    if(words.length===0){lines.push("");continue;}
+    var cur="";
+    for(var i=0;i<words.length;i++){
+      var test=cur+words[i];
+      if(tctx.measureText(test).width>w-padding*2){
+        lines.push(cur);
+        cur=words[i];
+      }else{
+        cur=test;
+      }
+    }
+    if(cur)lines.push(cur);
+  }
+
+  var h=lines.length*lineHeight+padding*2+20;
+  c.width=w*dpr;
+  c.height=h*dpr;
+  c.style.width=w+"px";
+  c.style.height=h+"px";
+  var ctx=c.getContext("2d");
+  ctx.scale(dpr,dpr);
+
+  ctx.fillStyle="#f0fdf4";
+  ctx.beginPath();
+  ctx.roundRect(0,0,w,h,8);
+  ctx.fill();
+
+  ctx.font=fontSize+"px -apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillStyle="#1a1a1a";
+  ctx.textBaseline="top";
+  for(var i=0;i<lines.length;i++){
+    ctx.fillText(lines[i],padding,padding+i*lineHeight);
+  }
+
+  ctx.save();
+  ctx.globalAlpha=0.08;
+  ctx.font="bold 14px -apple-system,sans-serif";
+  ctx.fillStyle="#000";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  var now=new Date();
+  var ts=now.getFullYear()+""+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0")+String(now.getHours()).padStart(2,"0")+String(now.getMinutes()).padStart(2,"0");
+  var wm=sid+" "+ts;
+  for(var y=30;y<h;y+=60){
+    for(var x=40;x<w;x+=120){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(-0.35);
+      ctx.fillText(wm,0,0);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
 }
 
 function startTimer(){
@@ -142,15 +212,11 @@ window.doDecrypt=function(){
       return crypto.subtle.decrypt({"name":"AES-CBC","iv":bytes.slice(16,32)},k,bytes.slice(32));
     }).then(function(buf){
       if(!alive)return;
-      var text=new TextDecoder().decode(buf);
+      plainText=new TextDecoder().decode(buf);
       try{localStorage.setItem("qre_"+N,"1");}catch(e){}
       alive=0;
       D="QRE:v1:"+btoa(String.fromCharCode.apply(null,window.crypto.getRandomValues(new Uint8Array(64))));
-      var el=document.getElementById("txt");
-      el.textContent="";
-      if(text.match(/^https?:\/\//)){
-        var a=document.createElement("a");a.href=text;a.target="_blank";a.textContent=text;el.appendChild(a);
-      }else{el.textContent=text;}
+      renderCanvas(plainText);
       document.getElementById("L").style.display="none";
       document.getElementById("R").style.display="block";
       document.getElementById("R").classList.add("show");
@@ -164,21 +230,21 @@ window.doDecrypt=function(){
 };
 
 window.doCopy=function(){
-  var t=document.getElementById("txt").textContent;
+  if(!plainText)return;
   var b=document.getElementById("cpbtn");
   function done(){b.textContent="已复制";setTimeout(function(){b.textContent="复制内容"},1500);}
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t).then(done).catch(function(){fallback();});
+    navigator.clipboard.writeText(plainText).then(done).catch(function(){fallback();});
   }else{fallback();}
   function fallback(){
     try{
-      var ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;left:-9999px;top:-9999px;opacity:0";
+      var ta=document.createElement("textarea");ta.value=plainText;ta.style.cssText="position:fixed;left:-9999px;top:-9999px;opacity:0";
       document.body.appendChild(ta);ta.focus();ta.setSelectionRange(0,ta.value.length);
       var ok=document.execCommand("copy");document.body.removeChild(ta);
       if(ok)done();else promptCopy();
     }catch(e){promptCopy();}
   }
-  function promptCopy(){window.prompt("请长按复制：",t);done();}
+  function promptCopy(){window.prompt("请长按复制：",plainText);done();}
 };
 
 document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
