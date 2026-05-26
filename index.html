@@ -84,7 +84,6 @@ function init(){
   sid=Math.random().toString(36).substring(2,8).toUpperCase();
   try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead("该消息已被查看过");}}catch(e){}
   if(alive&&ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");}
-  if(alive)setTimeout(function(){if(!alive)return;var a=performance.now();debugger;if(performance.now()-a>200){burn();}},500);
 }
 
 function burn(){
@@ -202,7 +201,6 @@ document.addEventListener("visibilitychange",function(){
 window.doDecrypt=function(){
   if(!alive)return;
   if(ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
-  var a=performance.now();debugger;if(performance.now()-a>200){burn();return;}
   var pwd=document.getElementById("pwd").value;
   var err=document.getElementById("err");
   err.textContent="";
