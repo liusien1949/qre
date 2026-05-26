@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Encrypted Message</title>
+</head>
+<body style="font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;margin:0">
+<div style="background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <div id="L">
+    <div style="font-size:48px;margin-bottom:12px">&#128274;</div>
+    <h2 style="margin:0 0 6px;font-size:18px">加密消息</h2>
+    <p style="color:#999;font-size:13px;margin:0 0 20px">输入密码查看（一次有效，阅后即焚）</p>
+    <input type="password" id="pwd" placeholder="请输入密码" autofocus style="width:100%;padding:12px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:16px;box-sizing:border-box;outline:none">
+    <button onclick="doDecrypt()" style="width:100%;padding:14px;background:#4a90d9;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px;touch-action:manipulation">解密查看</button>
+    <p id="err" style="color:#e74c3c;font-size:13px;min-height:18px;margin:10px 0 0"></p>
+  </div>
+  <div id="R" style="display:none;margin-top:16px;padding:14px;background:#f8fffe;border:1px solid #d4edda;border-radius:10px;text-align:left;word-break:break-all">
+    <p id="txt"></p>
+    <button onclick="doCopy()" id="cpbtn" style="width:100%;padding:10px;background:#f0f0f0;border:none;border-radius:8px;cursor:pointer;margin-top:8px;font-size:13px;touch-action:manipulation;min-height:44px">复制内容</button>
+    <div id="tmr" style="font-size:13px;color:#e67e22;margin-top:8px"></div>
+  </div>
+  <div id="DD" style="display:none">
+    <div style="font-size:48px;margin-bottom:12px">&#128274;&#128293;</div>
+    <h2 style="color:#e74c3c;margin:0 0 8px">已焚毁</h2>
+    <p style="color:#999;font-size:13px">该消息已被查看或已过期，无法再次解密。</p>
+  </div>
+</div>
+<script>
+(function(){
+var D="",N="",alive=1,viewing=0,viewLeft=0,viewTmr=null;
+
+function init(){
+  if(!window.crypto||!window.crypto.subtle){
+    document.getElementById("L").innerHTML='<div style="font-size:48px;margin-bottom:12px">&#128274;</div><h2 style="margin:0 0 6px;font-size:18px">浏览器不支持</h2><p style="color:#999;font-size:13px">当前浏览器不支持解密，请点击右上角用默认浏览器打开。</p>';
+    return;
+  }
+  var h=location.hash.substring(1);
+  if(!h||h.indexOf("QRE:v1:")!==0){
+    document.getElementById("L").innerHTML='<div style="font-size:48px;margin-bottom:12px">&#128274;</div><h2 style="margin:0 0 6px;font-size:18px">无效链接</h2><p style="color:#999;font-size:13px">未找到加密数据。</p>';
+    return;
+  }
+  D=h;
+  N=D.substring(7,23);
+  try{if(localStorage.getItem("qre_"+N)==="1"){alive=0;showDead();}}catch(e){}
+  if(alive)setTimeout(function(){if(!alive)return;var a=performance.now();debugger;if(performance.now()-a>200){kill();showDead();}},500);
+}
+
+function kill(){
+  alive=0;
+  D="QRE:v1:"+btoa(String.fromCharCode.apply(null,window.crypto.getRandomValues(new Uint8Array(64))));
+}
+
+function showDead(){
+  document.getElementById("L").style.display="none";
+  document.getElementById("R").style.display="none";
+  document.getElementById("DD").style.display="block";
+}
+
+function hideContent(){
+  viewing=0;
+  if(viewTmr)clearInterval(viewTmr);
+  document.getElementById("R").style.display="none";
+  document.getElementById("txt").textContent="";
+  showDead();
+}
+
+function startTimer(){
+  viewing=1;viewLeft=10;
+  var el=document.getElementById("tmr");
+  el.textContent="⏱ 剩余 "+viewLeft+" 秒";
+  el.style.color="#e67e22";
+  viewTmr=setInterval(function(){
+    viewLeft--;
+    if(viewLeft<=3)el.style.color="#e74c3c";
+    if(viewLeft<=0){clearInterval(viewTmr);hideContent();return;}
+    el.textContent="⏱ 剩余 "+viewLeft+" 秒";
+  },1000);
+}
+
+document.addEventListener("visibilitychange",function(){
+  if(viewing&&document.hidden)hideContent();
+});
+
+window.doDecrypt=function(){
+  if(!alive)return;
+  var a=performance.now();debugger;if(performance.now()-a>200){kill();location.reload();return;}
+  var pwd=document.getElementById("pwd").value;
+  var err=document.getElementById("err");
+  err.textContent="";
+  if(!pwd){err.textContent="请输入密码";return;}
+  try{
+    var raw=atob(D.substring(7));
+    var bytes=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+    if(bytes.length<33){err.textContent="数据异常";return;}
+    crypto.subtle.importKey("raw",new TextEncoder().encode(pwd),{"name":"PBKDF2"},false,["deriveKey"]
+    ).then(function(k){
+      return crypto.subtle.deriveKey({"name":"PBKDF2","salt":bytes.slice(0,16),"iterations":100000,"hash":"SHA-256"},k,{"name":"AES-CBC","length":256},false,["decrypt"]);
+    }).then(function(k){
+      return crypto.subtle.decrypt({"name":"AES-CBC","iv":bytes.slice(16,32)},k,bytes.slice(32));
+    }).then(function(buf){
+      if(!alive)return;
+      var text=new TextDecoder().decode(buf);
+      try{localStorage.setItem("qre_"+N,"1");}catch(e){}
+      kill();
+      var el=document.getElementById("txt");
+      el.textContent="";
+      if(text.match(/^https?:\/\//)){
+        var a=document.createElement("a");a.href=text;a.target="_blank";a.textContent=text;el.appendChild(a);
+      }else{el.textContent=text;}
+      document.getElementById("L").style.display="none";
+      document.getElementById("R").style.display="block";
+      startTimer();
+    }).catch(function(){err.textContent="密码错误";});
+  }catch(e){err.textContent="解密失败";}
+};
+
+window.doCopy=function(){
+  var t=document.getElementById("txt").textContent;
+  var b=document.getElementById("cpbtn");
+  function done(){b.textContent="已复制";setTimeout(function(){b.textContent="复制内容"},1500);}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(function(){fallback();});
+  }else{fallback();}
+  function fallback(){
+    try{
+      var ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;left:-9999px;top:-9999px;opacity:0";
+      document.body.appendChild(ta);ta.focus();ta.setSelectionRange(0,ta.value.length);
+      var ok=document.execCommand("copy");document.body.removeChild(ta);
+      if(ok)done();else promptCopy();
+    }catch(e){promptCopy();}
+  }
+  function promptCopy(){window.prompt("请长按复制：",t);done();}
+};
+
+document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
+document.addEventListener("contextmenu",function(e){e.preventDefault();});
+document.addEventListener("keydown",function(e){
+  if(e.key==="F12"||(e.ctrlKey&&e.shiftKey&&(e.key==="I"||e.key==="J"||e.key==="C"))||(e.ctrlKey&&e.key==="u"))e.preventDefault();
+});
+
+init();
+})();
+</script>
+</body>
+</html>
