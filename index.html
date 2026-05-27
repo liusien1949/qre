@@ -35,7 +35,8 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center}
 .overlay.show{display:flex}
 .overlay-card{background:#fff;border-radius:16px;padding:32px 28px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
-.overlay-card .disc-title{font-size:20px;color:#e74c3c;font-weight:800;margin-bottom:16px;letter-spacing:2px}
+.overlay-card .disc-icon{font-size:40px;color:#e74c3c;margin-bottom:8px}
+.overlay-card .disc-title{font-size:18px;color:#e74c3c;font-weight:800;margin-bottom:16px;letter-spacing:4px}
 .overlay-card .disc-text{font-size:14px;color:#333;font-weight:500;line-height:1.8;margin-bottom:24px}
 .overlay-card .disc-btns{display:flex;gap:12px;justify-content:center}
 .overlay-card .disc-btns button{flex:1;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s}
@@ -74,8 +75,9 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 </div>
 <div id="discOverlay" class="overlay">
   <div class="overlay-card">
+    <p class="disc-icon">&#9888;</p>
     <p class="disc-title">免责声明</p>
-    <p class="disc-text">本工具仅供技术学习与交流使用，严禁用于任何非法用途。<br>使用者须对自身行为承担全部法律责任，与工具作者无关。<br>继续操作即视为您已阅读并同意本声明。</p>
+    <p class="disc-text">本工具仅限用于合法的技术研究、安全测试及学习交流目的。<br>严禁将本工具用于任何违反法律法规、侵犯他人合法权益之行为。<br>使用者应自行承担因使用本工具所产生的一切法律后果，<br>开发者不承担任何直接或间接责任。<br>点击「我知道了」即表示您已充分理解并接受上述条款。</p>
     <div class="disc-btns">
       <button class="btn-ok" onclick="discOk()">我知道了</button>
       <button class="btn-no" onclick="discNo()">不看了</button>
