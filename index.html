@@ -32,6 +32,19 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
 .dead h2{font-size:20px;color:#e74c3c;margin-bottom:8px;font-weight:700}
 .dead p{font-size:13px;color:#999;line-height:1.5}
 .warn{font-size:12px;color:#999;margin-top:16px;padding:8px;background:#f8f8f8;border-radius:8px;line-height:1.4}
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.overlay-card{background:#fff;border-radius:16px;padding:32px 28px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.overlay-card .disc-text{font-size:18px;color:#e74c3c;font-weight:700;line-height:1.6;margin-bottom:24px}
+.overlay-card .disc-btns{display:flex;gap:12px;justify-content:center}
+.overlay-card .disc-btns button{flex:1;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-ok{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.btn-ok:hover{box-shadow:0 4px 15px rgba(102,126,234,0.4)}
+.btn-no{background:#f0f0f0;color:#666}
+.btn-no:hover{background:#e0e0e0}
+.img-zoom{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:998;align-items:center;justify-content:center;cursor:zoom-out}
+.img-zoom.show{display:flex}
+.img-zoom img{max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px}
 </style>
 </head>
 <body>
@@ -58,9 +71,21 @@ h2{font-size:20px;color:#1a1a1a;margin-bottom:6px;font-weight:700}
     <p id="deadMsg">该消息已被查看、密码错误、或触发安全保护，密钥已销毁，无法再次解密。</p>
   </div>
 </div>
+<div id="discOverlay" class="overlay">
+  <div class="overlay-card">
+    <p class="disc-text">该工具仅有技术交流用途，未经允许不可用于其他任何途径！</p>
+    <div class="disc-btns">
+      <button class="btn-ok" onclick="discOk()">我知道了</button>
+      <button class="btn-no" onclick="discNo()">不看了</button>
+    </div>
+  </div>
+</div>
+<div id="imgZoom" class="img-zoom" onclick="closeZoom()">
+  <img id="zoomImg" src="">
+</div>
 <script>
 (function(){
-var D="",N="",ET=0,VT=10,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",msgId="";
+var D="",N="",ET=0,VT=10,alive=1,viewing=0,viewLeft=0,viewTmr=null,plainText="",msgId="",imgRegions=[];
 
 function init(){
   if(!window.crypto||!window.crypto.subtle){
@@ -143,6 +168,7 @@ function renderCanvas(text){
   var padding=16;
   var fontSize=15;
   var lineHeight=fontSize*1.6;
+  imgRegions=[];
 
   function drawText(ctx,t,y0){
     var tmp=document.createElement("canvas");
@@ -204,9 +230,20 @@ function renderCanvas(text){
       var y=0;
       if(parsed.text){drawText(ctx,parsed.text,0);y=txtH;}
       for(var i=0;i<imgSizes.length;i++){
-        ctx.drawImage(imgSizes[i].el,(w-imgSizes[i].dw)/2,y+4,imgSizes[i].dw,imgSizes[i].dh);
+        var ix=(w-imgSizes[i].dw)/2;
+        ctx.drawImage(imgSizes[i].el,ix,y+4,imgSizes[i].dw,imgSizes[i].dh);
+        imgRegions.push({x:ix,y:y+4,w:imgSizes[i].dw,h:imgSizes[i].dh,src:imgs[i].data});
         y+=imgSizes[i].dh+8;
       }
+      c.onclick=function(ev){
+        var rect=c.getBoundingClientRect();
+        var cx=(ev.clientX-rect.left);
+        var cy=(ev.clientY-rect.top);
+        for(var j=0;j<imgRegions.length;j++){
+          var r=imgRegions[j];
+          if(cx>=r.x&&cx<=r.x+r.w&&cy>=r.y&&cy<=r.y+r.h){showZoom(r.src);return;}
+        }
+      };
     }
   }else if(text.indexOf("IMG:")===0){
     var dataUrl=text.substring(4);
@@ -218,6 +255,7 @@ function renderCanvas(text){
       var ctx=c.getContext("2d");ctx.scale(dpr,dpr);
       ctx.fillStyle="#f0fdf4";ctx.beginPath();ctx.roundRect(0,0,w,dh+padding*2,8);ctx.fill();
       ctx.drawImage(img,(w-dw)/2,padding,dw,dh);
+      c.onclick=function(){showZoom(dataUrl);};
     };
     img.src=dataUrl;
   }else{
@@ -262,13 +300,9 @@ document.addEventListener("visibilitychange",function(){
   if(viewing&&document.hidden)hideContent();
 });
 
-window.doDecrypt=function(){
-  if(!alive){showDead("该消息已被销毁");return;}
-  if(ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
+function doActualDecrypt(){
   var pwd=document.getElementById("pwd").value;
   var err=document.getElementById("err");
-  err.textContent="";
-  if(!pwd){err.textContent="请输入密码";return;}
 
   function doDecryptWithData(){
     if(!D||D.indexOf("QRE:v1:")!==0){err.textContent="加密数据无效";return;}
@@ -302,7 +336,6 @@ window.doDecrypt=function(){
   }
 
   if(msgId&&!D){
-    // 有消息ID但还没拉取数据 → 先拉取
     err.textContent="正在加载数据...";
     fetchData().then(function(){
       err.textContent="";
@@ -313,7 +346,36 @@ window.doDecrypt=function(){
   }else{
     doDecryptWithData();
   }
+}
+
+window.doDecrypt=function(){
+  if(!alive){showDead("该消息已被销毁");return;}
+  if(ET>0&&Date.now()/1000>ET){alive=0;showDead("该消息已过期");return;}
+  var pwd=document.getElementById("pwd").value;
+  var err=document.getElementById("err");
+  err.textContent="";
+  if(!pwd){err.textContent="请输入密码";return;}
+  document.getElementById("discOverlay").classList.add("show");
 };
+
+function discOk(){
+  document.getElementById("discOverlay").classList.remove("show");
+  doActualDecrypt();
+}
+
+function discNo(){
+  document.getElementById("discOverlay").classList.remove("show");
+  burn();
+}
+
+function closeZoom(){
+  document.getElementById("imgZoom").classList.remove("show");
+}
+
+function showZoom(src){
+  document.getElementById("zoomImg").src=src;
+  document.getElementById("imgZoom").classList.add("show");
+}
 
 document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
 document.addEventListener("contextmenu",function(e){e.preventDefault();});
