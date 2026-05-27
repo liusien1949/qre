@@ -345,7 +345,7 @@ function doActualDecrypt(){
       err.textContent="";
       doDecryptWithData();
     }).catch(function(e){
-      err.textContent="加载失败: "+e.message+"，请稍后重试";
+      err.textContent="数据正在加载，请稍后重试";
     });
   }else{
     doDecryptWithData();
