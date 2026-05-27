@@ -362,24 +362,24 @@ window.doDecrypt=function(){
   document.getElementById("discOverlay").classList.add("show");
 };
 
-function discOk(){
+window.discOk=function(){
   document.getElementById("discOverlay").classList.remove("show");
   doActualDecrypt();
-}
+};
 
-function discNo(){
+window.discNo=function(){
   document.getElementById("discOverlay").classList.remove("show");
   burn();
-}
+};
 
-function closeZoom(){
+window.closeZoom=function(){
   document.getElementById("imgZoom").classList.remove("show");
-}
+};
 
-function showZoom(src){
+window.showZoom=function(src){
   document.getElementById("zoomImg").src=src;
   document.getElementById("imgZoom").classList.add("show");
-}
+};
 
 document.getElementById("pwd").addEventListener("keydown",function(e){if(e.key==="Enter")doDecrypt();});
 document.addEventListener("contextmenu",function(e){e.preventDefault();});
